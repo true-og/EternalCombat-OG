@@ -17,6 +17,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.vehicle.VehicleMoveEvent;
+import org.bukkit.util.Vector;
 import org.spigotmc.event.entity.EntityMountEvent;
 
 public class KnockbackRegionController implements Listener {
@@ -55,16 +56,22 @@ public class KnockbackRegionController implements Listener {
         if (xTo != xFrom || yTo != yFrom || zTo != zFrom) {
             Optional<Region> regionOptional = this.regionProvider.getRegion(locationTo);
             if (regionOptional.isEmpty()) {
+                // Destination is not a safe zone (wilderness or warzone) -> allow the move.
                 return;
             }
 
             Region region = regionOptional.get();
-            if (region.contains(locationFrom)) {
+            if (this.regionProvider.isInRegion(locationFrom)) {
+                // Origin is itself a safe zone (player was already inside it, e.g. tagged there)
+                // -> eject them out through the nearest wall.
                 this.knockbackService.knockback(region, player);
                 this.knockbackService.forceKnockbackLater(player, region);
             } else {
+                // Origin is a legal area (wilderness or warzone) and they tried to step into a safe
+                // zone -> cancel the move and bounce them straight back the way they came.
                 event.setCancelled(true);
-                this.knockbackService.knockbackLater(region, player, Duration.ofMillis(50));
+                Vector back = locationFrom.toVector().subtract(locationTo.toVector());
+                this.knockbackService.knockbackDirectionLater(player, back, Duration.ofMillis(50));
             }
 
             this.noticeService.create()
@@ -118,11 +125,16 @@ public class KnockbackRegionController implements Listener {
             }
 
             Region region = regionOptional.get();
-            if (region.contains(locationFrom)) {
+            if (this.regionProvider.isInRegion(locationFrom)) {
                 this.knockbackService.knockback(region, player);
                 this.knockbackService.forceKnockbackLater(player, region);
             } else {
-                this.knockbackService.knockbackLater(region, player, Duration.ofMillis(50));
+                // VehicleMoveEvent cannot be cancelled, so bounce the mount back the way it came and
+                // schedule an eject as a fallback if it is still inside after the delay. The vehicle
+                // is moved with its rider rather than dismounting.
+                Vector back = locationFrom.toVector().subtract(locationTo.toVector());
+                this.knockbackService.knockbackDirectionLater(player, back, Duration.ofMillis(50));
+                this.knockbackService.forceKnockbackLater(player, region);
             }
 
             this.noticeService.create()

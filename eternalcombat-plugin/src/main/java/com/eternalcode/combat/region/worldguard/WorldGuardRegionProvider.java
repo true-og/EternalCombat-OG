@@ -38,17 +38,24 @@ public class WorldGuardRegionProvider implements RegionProvider {
         RegionQuery regionQuery = this.regionContainer.createQuery();
         ApplicableRegionSet applicableRegions = regionQuery.getApplicableRegions(BukkitAdapter.adapt(location));
 
-        ProtectedRegion highestPriorityRegion = this.highestPriorityRegion(applicableRegions);
-
-        if (highestPriorityRegion == null) {
+        if (applicableRegions.size() == 0) {
             return Optional.empty();
         }
 
-        if (this.isCombatRegion(highestPriorityRegion)) {
-            return Optional.of(new WorldGuardRegion(location.getWorld(), highestPriorityRegion));
+        if (!this.isRestricted(applicableRegions)) {
+            return Optional.empty();
         }
 
-        return Optional.empty();
+        // Eject relative to the innermost (highest-priority) region the player is standing in, not
+        // whichever region happens to set the PVP flag. The innermost region is the tightest box, so
+        // the knockback/teleport distance stays local instead of being measured against a giant
+        // world-spanning spawn region.
+        ProtectedRegion bounds = this.innermostRegion(applicableRegions);
+        if (bounds == null) {
+            return Optional.empty();
+        }
+
+        return Optional.of(new WorldGuardRegion(location.getWorld(), bounds));
     }
 
     @Override
@@ -61,11 +68,40 @@ public class WorldGuardRegionProvider implements RegionProvider {
         return regionManager.getRegions()
             .values()
             .stream()
-            .filter(region -> this.isCombatRegion(region))
+            .filter(this::isCombatRegion)
             .map(region -> (Region) new WorldGuardRegion(world, region))
             .toList();
     }
 
+    // Whether the player's current location is a no-PvP / restricted spot. Uses WorldGuard's own flag
+    // resolution (queryState) so inherited and priority-overridden PVP flags are honoured. This closes
+    // the holes where a child region (e.g. a shop) without its own PVP flag was treated as unprotected.
+    private boolean isRestricted(ApplicableRegionSet applicableRegions) {
+        StateFlag.State pvpState = this.pluginConfig.regions.preventPvpInRegions
+            ? applicableRegions.queryState(null, Flags.PVP)
+            : null;
+
+        // Effective PvP is denied here (inheritance/priority aware) -> safe zone, block entry.
+        if (pvpState == StateFlag.State.DENY) {
+            return true;
+        }
+
+        // A region in the blockedRegions list applies here, but never treat a spot as restricted when
+        // a higher-priority region explicitly allows PvP. Otherwise a large umbrella region (e.g. a
+        // world-spanning "spawn" listed in blockedRegions) would also block the warzone/arenas nested
+        // inside it.
+        if (pvpState != StateFlag.State.ALLOW) {
+            for (ProtectedRegion region : applicableRegions.getRegions()) {
+                if (this.regions.contains(region.getId())) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    // Per-region check used only for border rendering, where there is no single query point.
     private boolean isCombatRegion(ProtectedRegion region) {
         if (this.regions.contains(region.getId())) {
             return true;
@@ -83,7 +119,7 @@ public class WorldGuardRegionProvider implements RegionProvider {
     }
 
     @Nullable
-    private ProtectedRegion highestPriorityRegion(ApplicableRegionSet applicableRegions) {
+    private ProtectedRegion innermostRegion(ApplicableRegionSet applicableRegions) {
         return applicableRegions.getRegions().stream()
             .max(Comparator.comparingInt(ProtectedRegion::getPriority))
             .orElse(null);

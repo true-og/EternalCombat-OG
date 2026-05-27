@@ -155,13 +155,12 @@ dependencies {
 }
 
 bukkit {
-    name = "EternalCombat"
+    name = "EternalCombat-OG"
     main = "com.eternalcode.combat.CombatPlugin"
     version = project.version.toString()
     apiVersion = "1.19"
-    authors = listOf("EternalCodeTeam")
-    prefix = "EternalCombat"
-    name = "EternalCombat"
+    authors = listOf("EternalCodeTeam", "true-og")
+    prefix = "EternalCombat-OG"
     load = BukkitPluginDescription.PluginLoadOrder.POSTWORLD
     softDepend = listOf(
         "WorldGuard"
@@ -185,7 +184,7 @@ tasks {
 }
 
 tasks.shadowJar {
-    archiveFileName.set("EternalCombat-${project.version}.jar")
+    archiveFileName.set("EternalCombat-OG-${project.version}.jar")
 
     exclude(
         "org/intellij/lang/annotations/**",

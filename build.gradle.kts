@@ -11,7 +11,7 @@ val pluginProject = project(":eternalcombat-plugin")
 val pluginJar by tasks.registering(Copy::class) {
     dependsOn(":eternalcombat-plugin:shadowJar")
     from(pluginProject.provider {
-        pluginProject.layout.buildDirectory.file("libs/EternalCombat-${pluginProject.version}.jar").get().asFile
+        pluginProject.layout.buildDirectory.file("libs/EternalCombat-OG-${pluginProject.version}.jar").get().asFile
     })
     into(layout.buildDirectory.dir("libs"))
 }
