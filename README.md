@@ -16,6 +16,7 @@ This fork diverges from upstream EternalCombat in the following ways:
 - Renamed the project and plugin to `EternalCombat-OG`.
 - Fixed combat knockback flinging players across the map or into the sky near safe zones.
 - Players in combat can move between the warzone and wilderness, but not into safe areas.
+- Render the glass combat border on the true safe/unsafe boundary (e.g. between the warzone and spawn or the market) instead of a region's bounding box, so no wall shows between the warzone and wilderness or on the outer face of a large enclosing region.
 - Mounted players are pushed along with their mount instead of being thrown off.
 - Closed gaps that let combat-tagged players slip into shops and the market.
 - Removed chat gradients.
