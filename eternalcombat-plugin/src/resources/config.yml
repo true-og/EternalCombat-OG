@@ -20,7 +20,7 @@ settings:
   # Players in these worlds will not be tagged or affected by combat rules.
   ignoredWorlds:
   - HB1-hub
-  - Ancient_Plataeu
+  - Ancient_Plateau
   # - More to come when Multiverse is set up fully.
 #
 # Settings related to Ender Pearls.

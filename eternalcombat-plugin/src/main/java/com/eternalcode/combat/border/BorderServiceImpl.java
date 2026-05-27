@@ -3,12 +3,14 @@ package com.eternalcode.combat.border;
 import com.eternalcode.combat.border.event.BorderHideAsyncEvent;
 import com.eternalcode.combat.border.event.BorderShowAsyncEvent;
 import com.eternalcode.combat.event.EventManager;
+import com.eternalcode.combat.region.Region;
 import com.eternalcode.combat.region.RegionProvider;
 import com.eternalcode.commons.bukkit.scheduler.MinecraftScheduler;
-import com.eternalcode.commons.scheduler.Scheduler;
 import dev.rollczi.litecommands.shared.Lazy;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -20,8 +22,13 @@ import org.bukkit.entity.Player;
 
 public class BorderServiceImpl implements BorderService {
 
+    // Horizontal neighbour offsets (west, east, north, south). The border is a vertical wall, so only
+    // horizontal transitions between safe and unsafe space matter.
+    private static final int[][] HORIZONTAL_NEIGHBOURS = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+
     private final MinecraftScheduler scheduler;
     private final EventManager eventManager;
+    private final RegionProvider regionProvider;
 
     private final Supplier<BorderSettings> settings;
 
@@ -31,6 +38,7 @@ public class BorderServiceImpl implements BorderService {
     public BorderServiceImpl(MinecraftScheduler scheduler, Server server, RegionProvider provider, EventManager eventManager, Supplier<BorderSettings> settings) {
         this.scheduler = scheduler;
         this.eventManager = eventManager;
+        this.regionProvider = provider;
         this.settings = settings;
         this.borderIndexes = BorderTriggerIndex.started(server, scheduler, provider, settings);
     }
@@ -70,7 +78,7 @@ public class BorderServiceImpl implements BorderService {
     public void clearBorder(Player player) {
         World world = player.getWorld();
         UUID uniqueId = player.getUniqueId();
-        
+
         scheduler.runAsync(() -> {
             Set<BorderPoint> removed = this.activeBorderIndex.removePoints(world.getName(), uniqueId);
             if (!removed.isEmpty()) {
@@ -85,86 +93,67 @@ public class BorderServiceImpl implements BorderService {
     }
 
     private Optional<BorderResult> resolveBorder(Location location) {
-        List<BorderTrigger> triggered = borderIndexes.getTriggered(location);
-
-        if (triggered.isEmpty()) {
+        // Cheap gate: only build a border when the player is near a restricted region at all.
+        if (borderIndexes.getTriggered(location).isEmpty()) {
             return Optional.empty();
         }
 
         BorderLazyResult result = new BorderLazyResult();
-        for (BorderTrigger trigger : triggered) {
-            result.addLazyBorderPoints(new Lazy<>(() -> this.resolveBorderPoints(trigger, location)));
-        }
-
+        result.addLazyBorderPoints(new Lazy<>(() -> this.resolveBorderPoints(location)));
         return Optional.of(result);
     }
 
-    /* this code is ugly but is fast */
-    private List<BorderPoint> resolveBorderPoints(BorderTrigger trigger, Location playerLocation) {
-        BorderPoint borderMin = trigger.min();
-        BorderPoint borderMax = trigger.max();
+    // Render glass on the true boundary between safe (PvP-denied) and unsafe (PvP-allowed/wilderness)
+    // space, rather than around a region's bounding box. A wall block is placed on a safe column only
+    // when an adjacent column is unsafe, so the wall appears between the warzone and the safe spawn or
+    // market, but never between the warzone and the wilderness (both unsafe), and never on the outer
+    // face of a large umbrella region that merely encloses the warzone.
+    private List<BorderPoint> resolveBorderPoints(Location playerLocation) {
+        World world = playerLocation.getWorld();
+        int px = (int) Math.round(playerLocation.getX());
+        int py = (int) Math.round(playerLocation.getY());
+        int pz = (int) Math.round(playerLocation.getZ());
+        int distance = settings.get().distanceRounded();
 
-        int x = (int) Math.round(playerLocation.getX());
-        int y = (int) Math.round(playerLocation.getY());
-        int z = (int) Math.round(playerLocation.getZ());
-
-        int distanceRounded = settings.get().distanceRounded();
-        int realMinX = Math.max(borderMin.x(), x - distanceRounded);
-        int realMaxX = Math.min(borderMax.x(), x + distanceRounded);
-        int realMinY = Math.max(borderMin.y(), y - distanceRounded);
-        int realMaxY = Math.min(borderMax.y(), y + distanceRounded);
-        int realMinZ = Math.max(borderMin.z(), z - distanceRounded);
-        int realMaxZ = Math.min(borderMax.z(), z + distanceRounded);
+        // Sample, per column near the player, the safe region present at the player's Y (null = unsafe).
+        // Sampling one Y keeps this cheap; safe regions are effectively full-height in practice.
+        Map<Long, Region> columns = new HashMap<>();
+        for (int dx = -distance - 1; dx <= distance + 1; dx++) {
+            for (int dz = -distance - 1; dz <= distance + 1; dz++) {
+                int cx = px + dx;
+                int cz = pz + dz;
+                Region region = this.regionProvider.getRegion(new Location(world, cx, py, cz)).orElse(null);
+                columns.put(key(cx, cz), region);
+            }
+        }
 
         List<BorderPoint> points = new ArrayList<>();
+        for (int dx = -distance; dx <= distance; dx++) {
+            for (int dz = -distance; dz <= distance; dz++) {
+                int cx = px + dx;
+                int cz = pz + dz;
 
-        if (borderMin.y() >= realMinY) { // Bottom wall
-            for (int currentX = realMinX; currentX <= realMaxX - 1; currentX++) {
-                for (int currentZ = realMinZ; currentZ <= realMaxZ - 1; currentZ++) {
-                    addPoint(points, currentX, realMinY, currentZ, playerLocation, null);
+                // Only unsafe columns (where the player can stand) cast a wall onto safe neighbours.
+                if (columns.get(key(cx, cz)) != null) {
+                    continue;
                 }
-            }
-        }
 
-        if (borderMax.y() <= realMaxY) { // Top wall
-            for (int currentX = realMinX; currentX <= realMaxX; currentX++) {
-                for (int currentZ = realMinZ; currentZ <= realMaxZ; currentZ++) {
-                    BorderPoint innerPoint = new BorderPoint(Math.max(realMinX, currentX - 1), realMaxY - 1, Math.max(realMinZ, currentZ - 1));
-                    addPoint(points, currentX, realMaxY, currentZ, playerLocation, innerPoint);
-                }
-            }
-        }
+                for (int[] neighbour : HORIZONTAL_NEIGHBOURS) {
+                    int nx = cx + neighbour[0];
+                    int nz = cz + neighbour[1];
 
-        if (borderMin.x() >= realMinX) { // West wall (left)
-            for (int currentY = realMinY; currentY <= realMaxY - 1; currentY++) {
-                for (int currentZ = realMinZ; currentZ <= realMaxZ - 1; currentZ++) {
-                    addPoint(points, realMinX, currentY, currentZ, playerLocation, null);
-                }
-            }
-        }
+                    Region safeRegion = columns.get(key(nx, nz));
+                    if (safeRegion == null) {
+                        continue;
+                    }
 
-        if (borderMax.x() <= realMaxX) { // East wall (right)
-            for (int currentY = realMinY; currentY <= realMaxY; currentY++) {
-                for (int currentZ = realMinZ; currentZ <= realMaxZ; currentZ++) {
-                    BorderPoint innerPoint = new BorderPoint(realMaxX - 1, Math.max(realMinY, currentY - 1), Math.max(realMinZ, currentZ - 1));
-                    addPoint(points, realMaxX, currentY, currentZ, playerLocation, innerPoint);
-                }
-            }
-        }
-
-        if (borderMin.z() >= realMinZ) { // North wall (front)
-            for (int currentX = realMinX; currentX <= realMaxX - 1; currentX++) {
-                for (int currentY = realMinY; currentY <= realMaxY - 1; currentY++) {
-                    addPoint(points, currentX, currentY, realMinZ, playerLocation, null);
-                }
-            }
-        }
-
-        if (borderMax.z() <= realMaxZ) { // South wall (back)
-            for (int currentX = realMinX; currentX <= realMaxX; currentX++) {
-                for (int currentY = realMinY; currentY <= realMaxY; currentY++) {
-                    BorderPoint innerPoint = new BorderPoint(Math.max(realMinX, currentX - 1), Math.max(realMinY, currentY - 1), realMaxZ - 1);
-                    addPoint(points, currentX, currentY, realMaxZ, playerLocation, innerPoint);
+                    int minY = Math.max(py - distance, safeRegion.getMin().getBlockY());
+                    int maxY = Math.min(py + distance, safeRegion.getMax().getBlockY());
+                    for (int y = minY; y <= maxY; y++) {
+                        if (isVisible(nx, y, nz, playerLocation)) {
+                            points.add(new BorderPoint(nx, y, nz));
+                        }
+                    }
                 }
             }
         }
@@ -172,10 +161,8 @@ public class BorderServiceImpl implements BorderService {
         return points;
     }
 
-    private void addPoint(List<BorderPoint> points, int x, int y, int z, Location playerLocation, BorderPoint innerPoint) {
-        if (isVisible(x, y, z, playerLocation)) {
-            points.add(new BorderPoint(x, y, z, innerPoint));
-        }
+    private static long key(int x, int z) {
+        return (((long) x) << 32) ^ (z & 0xffffffffL);
     }
 
     private boolean isVisible(int x, int y, int z, Location player) {
