@@ -250,6 +250,18 @@ regions:
   blockedRegions:
   - spawn
   - market
+  - colosseum
+  - atlantis
+  - olympus
+  - ender
+  - cave
+  - blizzard
+  - fungi
+  - hell
+  - castle
+  - frozone
+  - sewer
+  - chasm
   # Prevent players from entering regions where PVP is disabled by WorldGuard.
   # Set to 'true' to enforce this restriction, or 'false' to allow PVP in all regions.
   preventPvpInRegions: true
