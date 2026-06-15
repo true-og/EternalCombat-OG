@@ -3,6 +3,7 @@ package com.eternalcode.combat.fight.pearl;
 import com.eternalcode.combat.fight.FightManager;
 import com.eternalcode.combat.notification.NoticeService;
 import com.eternalcode.combat.util.DurationUtil;
+import com.eternalcode.commons.bukkit.scheduler.MinecraftScheduler;
 import java.time.Duration;
 import java.util.UUID;
 import org.bukkit.Material;
@@ -22,17 +23,20 @@ public class FightPearlController implements Listener {
     private final NoticeService noticeService;
     private final FightManager fightManager;
     private final FightPearlService fightPearlService;
+    private final MinecraftScheduler scheduler;
 
     public FightPearlController(
         FightPearlSettings settings,
         NoticeService noticeService,
         FightManager fightManager,
-        FightPearlService fightPearlService
+        FightPearlService fightPearlService,
+        MinecraftScheduler scheduler
     ) {
         this.settings = settings;
         this.noticeService = noticeService;
         this.fightManager = fightManager;
         this.fightPearlService = fightPearlService;
+        this.scheduler = scheduler;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -99,6 +103,7 @@ public class FightPearlController implements Listener {
 
         this.fightPearlService.markDelay(playerId);
         int cooldownTicks = (int) (this.settings.pearlThrowDelay.toMillis() / 50);
-        player.setCooldown(Material.ENDER_PEARL, cooldownTicks);
+        // Defer one tick so the in-flight launch finishes before the item cooldown lands, else the first pearl is eaten without firing.
+        this.scheduler.runLater(() -> player.setCooldown(Material.ENDER_PEARL, cooldownTicks), Duration.ofMillis(50));
     }
 }
