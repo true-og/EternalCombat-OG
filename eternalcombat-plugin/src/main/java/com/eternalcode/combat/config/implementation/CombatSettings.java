@@ -1,12 +1,10 @@
 package com.eternalcode.combat.config.implementation;
 
-import com.eternalcode.combat.WhitelistBlacklistMode;
 import eu.okaeri.configs.OkaeriConfig;
 import eu.okaeri.configs.annotation.Comment;
 import java.util.List;
 import org.bukkit.entity.EntityType;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.entity.EntityDamageEvent.DamageCause;
 
 public class CombatSettings extends OkaeriConfig {
     @Comment({
@@ -38,30 +36,6 @@ public class CombatSettings extends OkaeriConfig {
         "# This setting blocks usage of fireworks to boost elytra flight during combat"
     })
     public boolean disableFireworks = true;
-
-    @Comment({
-        "# Enable or disable combat logging for damage caused by non-player entities.",
-        "# Set to 'true' to log damage from non-player sources, or 'false' to disable this feature."
-    })
-    public boolean enableDamageCauseLogging = false;
-
-    @Comment({
-        "# Set the mode for logging damage causes.",
-        "# Available modes: WHITELIST (only listed causes are logged), BLACKLIST (all causes except listed ones are logged)."
-    })
-    public WhitelistBlacklistMode damageCauseRestrictionMode = WhitelistBlacklistMode.WHITELIST;
-
-    @Comment({
-        "# List of damage causes to be logged based on the selected mode.",
-        "# In WHITELIST mode, only these causes are logged. In BLACKLIST mode, all causes except these are logged.",
-        "# For a full list of damage causes, visit: https://hub.spigotmc.org/javadocs/spigot/org/bukkit/event/entity/EntityDamageEvent.DamageCause.html"
-    })
-    public List<DamageCause> loggedDamageCauses = List.of(
-        DamageCause.LAVA,
-        DamageCause.CONTACT,
-        DamageCause.FIRE,
-        DamageCause.FIRE_TICK
-    );
 
     @Comment({
         "# List of projectile types that do not trigger combat tagging.",

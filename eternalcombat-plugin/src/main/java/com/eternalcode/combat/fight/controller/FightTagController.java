@@ -1,6 +1,5 @@
 package com.eternalcode.combat.fight.controller;
 
-import com.eternalcode.combat.WhitelistBlacklistMode;
 import com.eternalcode.combat.config.implementation.PluginConfig;
 import com.eternalcode.combat.fight.FightManager;
 import com.eternalcode.combat.fight.event.CauseOfTag;
@@ -76,37 +75,7 @@ public class FightTagController implements Listener {
     }
 
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
-    void onEntityDamage(EntityDamageEvent event) {
-        if (!this.config.combat.enableDamageCauseLogging) {
-            return;
-        }
-
-        if (!(event.getEntity() instanceof Player player)) {
-            return;
-        }
-
-        if (this.isPlayerInDisabledWorld(player)) {
-            return;
-        }
-
-        Duration combatTime = this.config.settings.combatTimerDuration;
-        UUID uuid = player.getUniqueId();
-
-        List<EntityDamageEvent.DamageCause> damageCauses = this.config.combat.loggedDamageCauses;
-        WhitelistBlacklistMode mode = this.config.combat.damageCauseRestrictionMode;
-
-        EntityDamageEvent.DamageCause cause = event.getCause();
-
-        boolean shouldLog = mode.shouldBlock(damageCauses.contains(cause));
-
-        if (shouldLog) {
-            return;
-        }
-
-        this.fightManager.tag(uuid, combatTime, CauseOfTag.NON_PLAYER);
-    }
-
+    // No onEntityDamage handler: combat is player-on-player only, so mob and environmental damage (lava, fire, fall, etc.) never tag the player.
 
     @Nullable
     Player getDamager(EntityDamageByEntityEvent event) {

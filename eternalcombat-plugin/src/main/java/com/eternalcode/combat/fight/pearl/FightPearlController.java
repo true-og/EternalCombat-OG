@@ -3,10 +3,8 @@ package com.eternalcode.combat.fight.pearl;
 import com.eternalcode.combat.fight.FightManager;
 import com.eternalcode.combat.notification.NoticeService;
 import com.eternalcode.combat.util.DurationUtil;
-import com.eternalcode.commons.bukkit.scheduler.MinecraftScheduler;
 import java.time.Duration;
 import java.util.UUID;
-import org.bukkit.Material;
 import org.bukkit.entity.EnderPearl;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -15,7 +13,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
-import org.bukkit.inventory.ItemStack;
 
 public class FightPearlController implements Listener {
 
@@ -23,20 +20,17 @@ public class FightPearlController implements Listener {
     private final NoticeService noticeService;
     private final FightManager fightManager;
     private final FightPearlService fightPearlService;
-    private final MinecraftScheduler scheduler;
 
     public FightPearlController(
         FightPearlSettings settings,
         NoticeService noticeService,
         FightManager fightManager,
-        FightPearlService fightPearlService,
-        MinecraftScheduler scheduler
+        FightPearlService fightPearlService
     ) {
         this.settings = settings;
         this.noticeService = noticeService;
         this.fightManager = fightManager;
         this.fightPearlService = fightPearlService;
-        this.scheduler = scheduler;
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -65,7 +59,7 @@ public class FightPearlController implements Listener {
         }
 
         if (this.settings.pearlCooldownEnabled) {
-            handlePearlCooldown(event, player, playerId);
+            handlePearlCooldown(event, playerId);
         }
     }
 
@@ -84,7 +78,7 @@ public class FightPearlController implements Listener {
         event.setDamage(0.0);
     }
 
-    private void handlePearlCooldown(ProjectileLaunchEvent event, Player player, UUID playerId) {
+    private void handlePearlCooldown(ProjectileLaunchEvent event, UUID playerId) {
         if (this.settings.pearlThrowDelay.isZero()) {
             return;
         }
@@ -101,9 +95,7 @@ public class FightPearlController implements Listener {
             return;
         }
 
+        // No player.setCooldown(ENDER_PEARL): it rolls back the client's predicted throw and eats the first pearl. Enforce server-side only.
         this.fightPearlService.markDelay(playerId);
-        int cooldownTicks = (int) (this.settings.pearlThrowDelay.toMillis() / 50);
-        // Defer one tick so the in-flight launch finishes before the item cooldown lands, else the first pearl is eaten without firing.
-        this.scheduler.runLater(() -> player.setCooldown(Material.ENDER_PEARL, cooldownTicks), Duration.ofMillis(50));
     }
 }
