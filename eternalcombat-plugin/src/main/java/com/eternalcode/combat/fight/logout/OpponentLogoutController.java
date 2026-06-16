@@ -3,8 +3,6 @@ package com.eternalcode.combat.fight.logout;
 import com.eternalcode.combat.fight.FightManager;
 import com.eternalcode.combat.fight.FightTag;
 import com.eternalcode.combat.fight.event.CauseOfUnTag;
-import com.eternalcode.commons.bukkit.scheduler.MinecraftScheduler;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -15,33 +13,27 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 
-// Release any player whose combat opponents have all logged off, since there is nobody left online to fight.
+// Immediately release any player whose combat opponents have all logged off, since there is nobody left online to fight.
 public class OpponentLogoutController implements Listener {
 
     private final FightManager fightManager;
     private final Server server;
-    private final MinecraftScheduler scheduler;
 
-    public OpponentLogoutController(FightManager fightManager, Server server, MinecraftScheduler scheduler) {
+    public OpponentLogoutController(FightManager fightManager, Server server) {
         this.fightManager = fightManager;
         this.server = server;
-        this.scheduler = scheduler;
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
-        // Defer one tick so the quitting player is fully offline before we decide who is left to fight.
-        this.scheduler.runLater(this::releaseOpponentlessPlayers, Duration.ofMillis(50));
-    }
-
-    private void releaseOpponentlessPlayers() {
+        UUID quitter = event.getPlayer().getUniqueId();
         List<UUID> toRelease = new ArrayList<>();
 
         for (FightTag tag : this.fightManager.getFights()) {
             UUID player = tag.getTaggedPlayer();
 
-            // An offline player is not stuck in combat, and untagging one would break message handlers that expect an online player.
-            if (this.server.getPlayer(player) == null) {
+            // The quitter handles their own logout; only release others who are still online.
+            if (player.equals(quitter) || this.server.getPlayer(player) == null) {
                 continue;
             }
 
@@ -52,7 +44,11 @@ public class OpponentLogoutController implements Listener {
                 continue;
             }
 
-            if (opponents.stream().allMatch(opponent -> this.server.getPlayer(opponent) == null)) {
+            // Treat the quitter as offline now, since they may still report online during their own quit event.
+            boolean allOpponentsOffline = opponents.stream()
+                .allMatch(opponent -> opponent.equals(quitter) || this.server.getPlayer(opponent) == null);
+
+            if (allOpponentsOffline) {
                 toRelease.add(player);
             }
         }

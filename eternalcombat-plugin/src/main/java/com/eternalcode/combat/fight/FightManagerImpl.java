@@ -20,8 +20,8 @@ import org.jetbrains.annotations.Nullable;
 public class FightManagerImpl implements FightManager {
 
     private final Map<UUID, FightTag> fights = new ConcurrentHashMap<>();
-    // Per-combatant set of players who tagged them; cleared only when that combatant leaves combat, so a dead/logged-off opponent is still seen (as offline) by whoever they fought.
-    private final Map<UUID, Set<UUID>> opponents = new ConcurrentHashMap<>();
+    // Per-combatant map of opponent -> when that pairing expires; entries expire with the combat tag so only current opponents count, avoiding stale links from earlier fights.
+    private final Map<UUID, Map<UUID, Instant>> opponents = new ConcurrentHashMap<>();
     private final EventManager eventManager;
 
     public FightManagerImpl(EventManager eventManager) {
@@ -72,7 +72,7 @@ public class FightManagerImpl implements FightManager {
         this.fights.put(target, fightTag);
 
         if (tagger != null) {
-            this.opponents.computeIfAbsent(target, key -> ConcurrentHashMap.newKeySet()).add(tagger);
+            this.opponents.computeIfAbsent(target, key -> new ConcurrentHashMap<>()).put(tagger, endOfCombatLog);
         }
 
         return event;
@@ -85,8 +85,16 @@ public class FightManagerImpl implements FightManager {
 
     @Override
     public Set<UUID> getOpponents(UUID player) {
-        Set<UUID> playerOpponents = this.opponents.get(player);
-        return playerOpponents == null ? Collections.emptySet() : Set.copyOf(playerOpponents);
+        Map<UUID, Instant> playerOpponents = this.opponents.get(player);
+        if (playerOpponents == null) {
+            return Collections.emptySet();
+        }
+
+        // Drop opponents whose pairing has expired so only players currently fighting this player are returned.
+        Instant now = Instant.now();
+        playerOpponents.entrySet().removeIf(entry -> !entry.getValue().isAfter(now));
+
+        return Set.copyOf(playerOpponents.keySet());
     }
 
     @Override

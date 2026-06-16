@@ -188,7 +188,7 @@ public final class CombatPlugin extends JavaPlugin implements EternalCombatApi {
             new KnockbackRegionController(noticeService, this.regionProvider, this.fightManager, knockbackService, server),
             new FightEffectController(pluginConfig.effect, this.fightEffectService, this.fightManager, server),
             new FightTagOutController(this.fightTagOutService),
-            new OpponentLogoutController(this.fightManager, server, scheduler),
+            new OpponentLogoutController(this.fightManager, server),
             new FightMessageController(this.fightManager, noticeService, pluginConfig, server),
             new BorderTriggerController(borderService, () -> pluginConfig.border, fightManager, server, scheduler),
             new ParticleController(borderService, () -> pluginConfig.border.particle, scheduler, server),
