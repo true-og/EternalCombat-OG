@@ -20,7 +20,7 @@ public class MessagesSettings extends OkaeriConfig {
         " ",
     })
     public Notice combatNotification = BukkitNotice.builder()
-        .actionBar("Combat ends in: <red>{TIME}</red>")
+        .actionBar("! You have <gold>{TIME}</gold> remaining in combat! ¡")
         .build();
 
     @Comment({
