@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.jetbrains.annotations.ApiStatus;
@@ -19,6 +20,8 @@ import org.jetbrains.annotations.Nullable;
 public class FightManagerImpl implements FightManager {
 
     private final Map<UUID, FightTag> fights = new ConcurrentHashMap<>();
+    // Per-combatant set of players who tagged them; cleared only when that combatant leaves combat, so a dead/logged-off opponent is still seen (as offline) by whoever they fought.
+    private final Map<UUID, Set<UUID>> opponents = new ConcurrentHashMap<>();
     private final EventManager eventManager;
 
     public FightManagerImpl(EventManager eventManager) {
@@ -44,6 +47,7 @@ public class FightManagerImpl implements FightManager {
         }
 
         this.fights.remove(player);
+        this.opponents.remove(player);
         return event;
     }
 
@@ -66,12 +70,23 @@ public class FightManagerImpl implements FightManager {
         FightTag fightTag = new FightTagImpl(target, endOfCombatLog, tagger);
 
         this.fights.put(target, fightTag);
+
+        if (tagger != null) {
+            this.opponents.computeIfAbsent(target, key -> ConcurrentHashMap.newKeySet()).add(tagger);
+        }
+
         return event;
     }
 
     @Override
     public Collection<FightTag> getFights() {
         return Collections.unmodifiableCollection(this.fights.values());
+    }
+
+    @Override
+    public Set<UUID> getOpponents(UUID player) {
+        Set<UUID> playerOpponents = this.opponents.get(player);
+        return playerOpponents == null ? Collections.emptySet() : Set.copyOf(playerOpponents);
     }
 
     @Override
@@ -82,5 +97,6 @@ public class FightManagerImpl implements FightManager {
     @Override
     public void untagAll() {
         this.fights.clear();
+        this.opponents.clear();
     }
 }

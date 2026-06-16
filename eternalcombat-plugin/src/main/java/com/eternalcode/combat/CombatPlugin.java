@@ -40,6 +40,7 @@ import com.eternalcode.combat.fight.knockback.KnockbackRegionController;
 import com.eternalcode.combat.fight.knockback.KnockbackService;
 import com.eternalcode.combat.fight.logout.LogoutController;
 import com.eternalcode.combat.fight.logout.LogoutService;
+import com.eternalcode.combat.fight.logout.OpponentLogoutController;
 import com.eternalcode.combat.fight.pearl.FightPearlController;
 import com.eternalcode.combat.fight.pearl.FightPearlService;
 import com.eternalcode.combat.fight.pearl.FightPearlServiceImpl;
@@ -187,6 +188,7 @@ public final class CombatPlugin extends JavaPlugin implements EternalCombatApi {
             new KnockbackRegionController(noticeService, this.regionProvider, this.fightManager, knockbackService, server),
             new FightEffectController(pluginConfig.effect, this.fightEffectService, this.fightManager, server),
             new FightTagOutController(this.fightTagOutService),
+            new OpponentLogoutController(this.fightManager, server, scheduler),
             new FightMessageController(this.fightManager, noticeService, pluginConfig, server),
             new BorderTriggerController(borderService, () -> pluginConfig.border, fightManager, server, scheduler),
             new ParticleController(borderService, () -> pluginConfig.border.particle, scheduler, server),

@@ -32,6 +32,11 @@ public enum CauseOfUnTag {
     ATTACKER_RELEASE,
 
     /**
+     * All of the player's combat opponents logged out, so there was nobody left to fight.
+     */
+    OPPONENT_LOGOUT,
+
+    /**
      * A custom cause, typically defined by external plugins or systems.
      */
     CUSTOM

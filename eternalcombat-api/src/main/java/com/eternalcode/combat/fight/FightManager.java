@@ -6,6 +6,7 @@ import com.eternalcode.combat.fight.event.FightTagEvent;
 import com.eternalcode.combat.fight.event.FightUntagEvent;
 import java.time.Duration;
 import java.util.Collection;
+import java.util.Set;
 import java.util.UUID;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Nullable;
@@ -17,6 +18,10 @@ public interface FightManager {
     FightTag getTag(UUID target);
 
     Collection<FightTag> getFights();
+
+    // Players who tagged the given player during their current combat session.
+    @ApiStatus.Experimental
+    Set<UUID> getOpponents(UUID player);
 
     @ApiStatus.Experimental
     FightTagEvent tag(UUID target, Duration delay, CauseOfTag causeOfTag, @Nullable UUID tagger);
