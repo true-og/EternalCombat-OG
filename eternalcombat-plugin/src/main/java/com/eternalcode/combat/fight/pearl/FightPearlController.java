@@ -5,14 +5,19 @@ import com.eternalcode.combat.notification.NoticeService;
 import com.eternalcode.combat.util.DurationUtil;
 import java.time.Duration;
 import java.util.UUID;
+import org.bukkit.Material;
 import org.bukkit.entity.EnderPearl;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.ProjectileLaunchEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.ItemStack;
 
 public class FightPearlController implements Listener {
 
@@ -33,8 +38,59 @@ public class FightPearlController implements Listener {
         this.fightPearlService = fightPearlService;
     }
 
+    // Block at interact via setUseItemInHand(DENY): stops the throw without consuming the pearl or desyncing the client, and never marks the delay so it can't self-cancel the first throw.
+    // No ignoreCancelled: RIGHT_CLICK_AIR is cancelled-by-default in Bukkit, so skipping cancelled events would miss the common throw path and bypass the cooldown.
     @EventHandler(priority = EventPriority.HIGHEST)
+    public void onPearlInteract(PlayerInteractEvent event) {
+        Action action = event.getAction();
+        if (action != Action.RIGHT_CLICK_AIR && action != Action.RIGHT_CLICK_BLOCK) {
+            return;
+        }
+
+        ItemStack item = event.getItem();
+        if (item == null || item.getType() != Material.ENDER_PEARL) {
+            return;
+        }
+
+        Player player = event.getPlayer();
+        UUID playerId = player.getUniqueId();
+
+        if (!this.fightManager.isInCombat(playerId)) {
+            return;
+        }
+
+        if (this.settings.pearlThrowDisabledDuringCombat) {
+            event.setUseItemInHand(Event.Result.DENY);
+            this.noticeService.create()
+                .player(playerId)
+                .notice(this.settings.pearlThrowBlockedDuringCombat)
+                .send();
+            return;
+        }
+
+        if (!this.settings.pearlCooldownEnabled || this.settings.pearlThrowDelay.isZero()) {
+            return;
+        }
+
+        if (this.fightPearlService.hasDelay(playerId)) {
+            event.setUseItemInHand(Event.Result.DENY);
+            Duration remainingDelay = this.fightPearlService.getRemainingDelay(playerId);
+
+            this.noticeService.create()
+                .player(playerId)
+                .notice(this.settings.pearlThrowBlockedDelayDuringCombat)
+                .placeholder("{TIME}", DurationUtil.format(remainingDelay))
+                .send();
+        }
+    }
+
+    // Start the cooldown only once a pearl actually launches, so the timer reflects successful throws.
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPearlThrow(ProjectileLaunchEvent event) {
+        if (!this.settings.pearlCooldownEnabled || this.settings.pearlThrowDelay.isZero()) {
+            return;
+        }
+
         if (!(event.getEntity() instanceof EnderPearl)) {
             return;
         }
@@ -49,18 +105,7 @@ public class FightPearlController implements Listener {
             return;
         }
 
-        if (this.settings.pearlThrowDisabledDuringCombat) {
-            event.setCancelled(true);
-            this.noticeService.create()
-                .player(playerId)
-                .notice(this.settings.pearlThrowBlockedDuringCombat)
-                .send();
-            return;
-        }
-
-        if (this.settings.pearlCooldownEnabled) {
-            handlePearlCooldown(event, playerId);
-        }
+        this.fightPearlService.markDelay(playerId);
     }
 
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -76,26 +121,5 @@ public class FightPearlController implements Listener {
         }
 
         event.setDamage(0.0);
-    }
-
-    private void handlePearlCooldown(ProjectileLaunchEvent event, UUID playerId) {
-        if (this.settings.pearlThrowDelay.isZero()) {
-            return;
-        }
-
-        if (this.fightPearlService.hasDelay(playerId)) {
-            event.setCancelled(true);
-            Duration remainingDelay = this.fightPearlService.getRemainingDelay(playerId);
-
-            this.noticeService.create()
-                .player(playerId)
-                .notice(this.settings.pearlThrowBlockedDelayDuringCombat)
-                .placeholder("{TIME}", DurationUtil.format(remainingDelay))
-                .send();
-            return;
-        }
-
-        // No player.setCooldown(ENDER_PEARL): it rolls back the client's predicted throw and eats the first pearl. Enforce server-side only.
-        this.fightPearlService.markDelay(playerId);
     }
 }
