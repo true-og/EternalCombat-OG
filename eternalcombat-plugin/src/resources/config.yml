@@ -390,7 +390,7 @@ messagesSettings:
   # You can use the {TIME} variable to display the remaining combat time.
   #
   combatNotification:
-    actionbar: '<red>!</red> You have <gold>{TIME}</gold> remaining in combat<red>!</red> <red>¡</red>'
+    actionbar: '<red>!</red> You have <gold>{TIME}</gold> remaining in combat <red>¡</red>'
   # Would you like to display milliseconds instead of seconds in combat notification
   withoutMillis: true
   # Message displayed when a player lacks permission to execute a command.
