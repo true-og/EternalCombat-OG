@@ -124,7 +124,8 @@ public class FightTagController implements Listener {
     private boolean isPlayerInDisabledWorld(Player player) {
         String worldName = player.getWorld().getName();
 
-        return this.config.settings.ignoredWorlds.contains(worldName);
+        // Treat allowedWorlds as a whitelist: if the world is not listed, consider it disabled
+        return !this.config.settings.allowedWorlds.contains(worldName);
     }
 
 

@@ -16,12 +16,13 @@ settings:
   # The duration (in seconds) that a player remains in combat after being attacked.
   # After this time expires, the player will no longer be considered in combat.
   combatTimerDuration: 20s
-  # List of worlds where combat logging is disabled.
-  # Players in these worlds will not be tagged or affected by combat rules.
-  ignoredWorlds:
-  - HB1-hub
-  - Ancient_Plateau
-  # - More to come when Multiverse is set up fully.
+  # List of worlds where combat logging is enabled (whitelist).
+  # Only players in these worlds will be tagged and affected by combat rules.
+  allowedWorlds:
+  - world
+  - world_nether
+  - world_the_end
+  # - Add more worlds here if needed.
 #
 # Settings related to Ender Pearls.
 # Configure cooldowns, restrictions, and other behaviors for Ender Pearls during combat.

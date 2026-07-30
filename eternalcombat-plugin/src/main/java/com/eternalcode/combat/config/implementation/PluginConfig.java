@@ -147,11 +147,13 @@ public class PluginConfig extends OkaeriConfig {
         public Duration combatTimerDuration = Duration.ofSeconds(20);
 
         @Comment({
-            "# List of worlds where combat logging is disabled.",
-            "# Players in these worlds will not be tagged or affected by combat rules."
+            "# List of worlds where combat logging is enabled (whitelist).",
+            "# Only players in these worlds will be tagged and affected by combat rules."
         })
-        public List<String> ignoredWorlds = List.of(
-            "your_world"
+        public List<String> allowedWorlds = List.of(
+            "world",
+            "world_nether",
+            "world_the_end"
         );
     }
 }

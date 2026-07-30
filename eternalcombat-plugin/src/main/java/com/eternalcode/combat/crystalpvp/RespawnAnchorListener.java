@@ -69,7 +69,7 @@ public class RespawnAnchorListener implements Listener {
             return;
         }
 
-        if (pluginConfig.settings.ignoredWorlds.contains(event.getEntity().getWorld().getName())) {
+        if (!pluginConfig.settings.allowedWorlds.contains(event.getEntity().getWorld().getName())) {
             return;
         }
 
